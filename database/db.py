@@ -10,6 +10,8 @@ from werkzeug.security import generate_password_hash
 
 DB_PATH = Path(__file__).parent.parent / "expense_tracker.db"
 
+CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"]
+
 
 def get_db():
     conn = sqlite3.connect(DB_PATH)
@@ -26,24 +28,18 @@ def init_db():
             name TEXT NOT NULL,
             email TEXT NOT NULL UNIQUE,
             password_hash TEXT NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );
-
-        CREATE TABLE IF NOT EXISTS categories (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT NOT NULL UNIQUE
+            created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
         CREATE TABLE IF NOT EXISTS expenses (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             user_id INTEGER NOT NULL,
-            category_id INTEGER,
             amount REAL NOT NULL,
+            category TEXT NOT NULL,
+            date TEXT NOT NULL,
             description TEXT,
-            expense_date DATE NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-            FOREIGN KEY (category_id) REFERENCES categories (id) ON DELETE SET NULL
+            created_at TEXT NOT NULL DEFAULT (datetime('now')),
+            FOREIGN KEY (user_id) REFERENCES users (id)
         );
     """)
     conn.commit()
@@ -53,41 +49,34 @@ def init_db():
 def seed_db():
     conn = get_db()
 
-    categories = ["Food", "Transport", "Housing", "Entertainment", "Utilities", "Other"]
-    conn.executemany(
-        "INSERT OR IGNORE INTO categories (name) VALUES (?)",
-        [(name,) for name in categories],
+    user_count = conn.execute("SELECT COUNT(*) FROM users").fetchone()[0]
+    if user_count > 0:
+        conn.close()
+        return
+
+    cursor = conn.execute(
+        "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
+        ("Demo User", "demo@spendly.com", generate_password_hash("demo123")),
     )
+    user_id = cursor.lastrowid
 
-    existing = conn.execute(
-        "SELECT id FROM users WHERE email = ?", ("nitish@example.com",)
-    ).fetchone()
-
-    if existing is None:
-        cursor = conn.execute(
-            "INSERT INTO users (name, email, password_hash) VALUES (?, ?, ?)",
-            ("Nitish Kumar", "nitish@example.com", generate_password_hash("password123")),
-        )
-        user_id = cursor.lastrowid
-
-        food_id = conn.execute(
-            "SELECT id FROM categories WHERE name = ?", ("Food",)
-        ).fetchone()["id"]
-        transport_id = conn.execute(
-            "SELECT id FROM categories WHERE name = ?", ("Transport",)
-        ).fetchone()["id"]
-
-        conn.executemany(
-            """
-            INSERT INTO expenses (user_id, category_id, amount, description, expense_date)
-            VALUES (?, ?, ?, ?, ?)
-            """,
-            [
-                (user_id, food_id, 12.50, "Lunch", "2026-09-15"),
-                (user_id, transport_id, 30.00, "Metro card top-up", "2026-09-16"),
-                (user_id, food_id, 45.20, "Groceries", "2026-09-18"),
-            ],
-        )
+    expenses = [
+        (user_id, 12.50, "Food", "2026-09-02", "Lunch"),
+        (user_id, 30.00, "Transport", "2026-09-03", "Metro card top-up"),
+        (user_id, 85.00, "Bills", "2026-09-05", "Electricity bill"),
+        (user_id, 22.75, "Health", "2026-09-08", "Pharmacy"),
+        (user_id, 18.00, "Entertainment", "2026-09-11", "Movie tickets"),
+        (user_id, 54.30, "Shopping", "2026-09-14", "New shirt"),
+        (user_id, 9.99, "Other", "2026-09-17", "Miscellaneous"),
+        (user_id, 45.20, "Food", "2026-09-20", "Groceries"),
+    ]
+    conn.executemany(
+        """
+        INSERT INTO expenses (user_id, amount, category, date, description)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        expenses,
+    )
 
     conn.commit()
     conn.close()
