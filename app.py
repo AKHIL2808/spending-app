@@ -66,7 +66,7 @@ def register():
 def login():
     if request.method == "GET":
         if session.get("user_id"):
-            return redirect(url_for("landing"))
+            return redirect(url_for("profile"))
         return render_template("login.html")
 
     email = request.form.get("email", "").strip().lower()
@@ -86,7 +86,8 @@ def login():
 
     session.clear()
     session["user_id"] = user["id"]
-    return redirect(url_for("landing"))
+    session["user_name"] = user["name"]
+    return redirect(url_for("profile"))
 
 
 @app.route("/logout")
@@ -105,13 +106,57 @@ def privacy():
     return render_template("privacy.html")
 
 
+@app.route("/profile")
+def profile():
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    # Hardcoded placeholder data — Step 5 replaces this with DB queries.
+    user = {
+        "name": "Demo User",
+        "email": "demo@spendly.com",
+        "initials": "DU",
+        "member_since": "January 2026",
+    }
+    stats = {
+        "total_spent": "₹12,450.00",
+        "transaction_count": 8,
+        "top_category": "Food",
+    }
+    transactions = [
+        {"date": "2026-10-05", "description": "Groceries", "category": "Food",
+         "slug": "food", "amount": "₹850.00"},
+        {"date": "2026-10-04", "description": "Metro card top-up", "category": "Transport",
+         "slug": "transport", "amount": "₹500.00"},
+        {"date": "2026-10-03", "description": "Electricity bill", "category": "Bills",
+         "slug": "bills", "amount": "₹2,300.00"},
+        {"date": "2026-10-02", "description": "New shirt", "category": "Shopping",
+         "slug": "shopping", "amount": "₹1,799.00"},
+        {"date": "2026-10-01", "description": "Dinner out", "category": "Food",
+         "slug": "food", "amount": "₹1,200.00"},
+        {"date": "2026-09-29", "description": "Pharmacy", "category": "Health",
+         "slug": "other", "amount": "₹650.00"},
+    ]
+    categories = [
+        {"name": "Food", "slug": "food", "total": "₹4,350.00", "percent": 35},
+        {"name": "Bills", "slug": "bills", "total": "₹3,100.00", "percent": 25},
+        {"name": "Shopping", "slug": "shopping", "total": "₹2,500.00", "percent": 20},
+        {"name": "Transport", "slug": "transport", "total": "₹1,500.00", "percent": 12},
+        {"name": "Other", "slug": "other", "total": "₹1,000.00", "percent": 8},
+    ]
+
+    return render_template(
+        "profile.html",
+        user=user,
+        stats=stats,
+        transactions=transactions,
+        categories=categories,
+    )
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
-
-@app.route("/profile")
-def profile():
-    return "Profile page — coming in Step 4"
 
 
 @app.route("/expenses/add")
