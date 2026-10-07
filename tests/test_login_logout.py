@@ -96,10 +96,21 @@ def test_navbar_logged_out(client):
 
 def test_navbar_logged_in(client):
     login(client)
-    html = client.get("/").get_data(as_text=True)
+    html = client.get("/profile").get_data(as_text=True)
     assert "Profile" in html
     assert "Sign out" in html
     assert "Get started" not in html
+
+
+def test_landing_redirects_to_profile_when_logged_in(client):
+    login(client)
+    resp = client.get("/")
+    assert resp.status_code == 302
+    assert resp.headers["Location"].endswith("/profile")
+
+
+def test_landing_renders_when_logged_out(client):
+    assert client.get("/").status_code == 200
 
 
 def test_login_page_redirects_when_logged_in(client):
