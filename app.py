@@ -1,10 +1,20 @@
 import os
 import sqlite3
+from datetime import datetime
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
-from database.db import create_user, get_user_by_email, init_db, seed_db
+from database.db import (
+    create_user,
+    get_category_breakdown,
+    get_expense_summary,
+    get_recent_expenses,
+    get_user_by_email,
+    get_user_by_id,
+    init_db,
+    seed_db,
+)
 
 app = Flask(__name__)
 # Development-only fallback; set SECRET_KEY in the environment for real use.
@@ -13,6 +23,79 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-only-insecure-key-change-me")
 with app.app_context():
     init_db()
     seed_db()
+
+
+# ------------------------------------------------------------------ #
+# Helpers                                                             #
+# ------------------------------------------------------------------ #
+
+# Must match the badge--/breakdown-meter-- classes in static/css/profile.css.
+CATEGORY_SLUGS = {"food", "transport", "bills", "shopping"}
+
+
+def _format_currency(value):
+    return f"₹{value:,.2f}"
+
+
+def _format_member_since(created_at):
+    # Blank rather than crash the page if created_at is missing or malformed.
+    try:
+        parsed = datetime.strptime(created_at, "%Y-%m-%d %H:%M:%S")
+        return parsed.strftime("%B %Y")
+    except (TypeError, ValueError):
+        return ""
+
+
+def _initials(name):
+    letters = [word[0] for word in name.split()[:2]]
+    return "".join(letters).upper() or "?"
+
+
+def _category_slug(name):
+    slug = name.lower()
+    return slug if slug in CATEGORY_SLUGS else "other"
+
+
+def _build_profile_context(user_row):
+    user_id = user_row["id"]
+    summary = get_expense_summary(user_id)
+
+    user = {
+        "name": user_row["name"],
+        "email": user_row["email"],
+        "initials": _initials(user_row["name"]),
+        "member_since": _format_member_since(user_row["created_at"]),
+    }
+    stats = {
+        "total_spent": _format_currency(summary["total_spent"]),
+        "transaction_count": summary["transaction_count"],
+        "top_category": summary["top_category"] or "—",
+    }
+    transactions = [
+        {
+            "date": expense["date"],
+            "description": expense["description"],
+            "category": expense["category"],
+            "slug": _category_slug(expense["category"]),
+            "amount": _format_currency(expense["amount"]),
+        }
+        for expense in get_recent_expenses(user_id)
+    ]
+    categories = [
+        {
+            "name": category["name"],
+            "slug": _category_slug(category["name"]),
+            "total": _format_currency(category["total"]),
+            "percent": category["percent"],
+        }
+        for category in get_category_breakdown(user_id)
+    ]
+    return {
+        "user": user,
+        "stats": stats,
+        "transactions": transactions,
+        "categories": categories,
+    }
 
 
 # ------------------------------------------------------------------ #
@@ -110,50 +193,18 @@ def privacy():
 
 @app.route("/profile")
 def profile():
-    if not session.get("user_id"):
+    user_id = session.get("user_id")
+    if not user_id:
         return redirect(url_for("login"))
 
-    # Hardcoded placeholder data — Step 5 replaces this with DB queries.
-    user = {
-        "name": "Demo User",
-        "email": "demo@spendly.com",
-        "initials": "DU",
-        "member_since": "January 2026",
-    }
-    stats = {
-        "total_spent": "₹12,450.00",
-        "transaction_count": 8,
-        "top_category": "Food",
-    }
-    transactions = [
-        {"date": "2026-10-05", "description": "Groceries", "category": "Food",
-         "slug": "food", "amount": "₹850.00"},
-        {"date": "2026-10-04", "description": "Metro card top-up", "category": "Transport",
-         "slug": "transport", "amount": "₹500.00"},
-        {"date": "2026-10-03", "description": "Electricity bill", "category": "Bills",
-         "slug": "bills", "amount": "₹2,300.00"},
-        {"date": "2026-10-02", "description": "New shirt", "category": "Shopping",
-         "slug": "shopping", "amount": "₹1,799.00"},
-        {"date": "2026-10-01", "description": "Dinner out", "category": "Food",
-         "slug": "food", "amount": "₹1,200.00"},
-        {"date": "2026-09-29", "description": "Pharmacy", "category": "Health",
-         "slug": "other", "amount": "₹650.00"},
-    ]
-    categories = [
-        {"name": "Food", "slug": "food", "total": "₹4,350.00", "percent": 35},
-        {"name": "Bills", "slug": "bills", "total": "₹3,100.00", "percent": 25},
-        {"name": "Shopping", "slug": "shopping", "total": "₹2,500.00", "percent": 20},
-        {"name": "Transport", "slug": "transport", "total": "₹1,500.00", "percent": 12},
-        {"name": "Other", "slug": "other", "total": "₹1,000.00", "percent": 8},
-    ]
+    user_row = get_user_by_id(user_id)
+    if user_row is None:
+        session.clear()
+        return redirect(url_for("login"))
 
-    return render_template(
-        "profile.html",
-        user=user,
-        stats=stats,
-        transactions=transactions,
-        categories=categories,
-    )
+    context = _build_profile_context(user_row)
+
+    return render_template("profile.html", **context)
 
 
 # ------------------------------------------------------------------ #

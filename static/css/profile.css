@@ -251,6 +251,15 @@
 .breakdown-meter--other::-webkit-progress-value { background: var(--ink-faint); }
 .breakdown-meter--other::-moz-progress-bar { background: var(--ink-faint); }
 
+/* ---------------- Empty state ---------------- */
+.empty-state {
+    padding: 1.5rem;
+    text-align: center;
+    color: var(--ink-muted);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-md);
+}
+
 /* ---------------- Responsive ---------------- */
 @media (max-width: 900px) {
     .profile-grid { grid-template-columns: 1fr; }
