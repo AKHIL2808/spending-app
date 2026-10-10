@@ -39,6 +39,7 @@
     <div class="profile-grid">
         <section class="profile-panel">
             <h2 class="profile-panel-title"><i data-lucide="list"></i>Transaction history</h2>
+            {% if transactions %}
             <div class="table-wrap">
                 <table class="txn-table">
                     <thead>
@@ -61,10 +62,14 @@
                     </tbody>
                 </table>
             </div>
+            {% else %}
+            <p class="empty-state">No transactions yet.</p>
+            {% endif %}
         </section>
 
         <section class="profile-panel">
             <h2 class="profile-panel-title"><i data-lucide="pie-chart"></i>Category breakdown</h2>
+            {% if categories %}
             <ul class="breakdown-list">
                 {% for c in categories %}
                 <li class="breakdown-row">
@@ -74,6 +79,9 @@
                 </li>
                 {% endfor %}
             </ul>
+            {% else %}
+            <p class="empty-state">No spending to break down yet.</p>
+            {% endif %}
         </section>
     </div>
 
