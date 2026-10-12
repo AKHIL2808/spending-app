@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+
+{% block title %}Analytics — Spendly{% endblock %}
+
+{% block head %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/analytics.css') }}">
+{% endblock %}
+
+{% block content %}
+<div class="analytics-page">
+
+    <header class="analytics-header">
+        <span class="analytics-badge">Coming soon</span>
+        <h1 class="analytics-title">Analytics</h1>
+        <p class="analytics-lead">
+            We're building charts and spending insights to help you see where your money goes.
+            There's nothing to set up — once they're ready, they'll appear right here.
+        </p>
+    </header>
+
+    <section class="analytics-card">
+        <h2 class="analytics-card-title">What's planned</h2>
+        <ul class="analytics-features">
+            <li class="analytics-feature">
+                <span class="analytics-feature-icon"><i data-lucide="trending-up"></i></span>
+                <div class="analytics-feature-text">
+                    <h3 class="analytics-feature-name">Monthly spending trends</h3>
+                    <p class="analytics-feature-desc">See how your spending changes from month to month.</p>
+                </div>
+            </li>
+            <li class="analytics-feature">
+                <span class="analytics-feature-icon"><i data-lucide="pie-chart"></i></span>
+                <div class="analytics-feature-text">
+                    <h3 class="analytics-feature-name">Category charts</h3>
+                    <p class="analytics-feature-desc">Visual breakdowns of where each rupee goes.</p>
+                </div>
+            </li>
+            <li class="analytics-feature">
+                <span class="analytics-feature-icon"><i data-lucide="target"></i></span>
+                <div class="analytics-feature-text">
+                    <h3 class="analytics-feature-name">Budget tracking</h3>
+                    <p class="analytics-feature-desc">Set limits and track your progress against them.</p>
+                </div>
+            </li>
+        </ul>
+    </section>
+
+    <a class="btn-ghost analytics-back" href="{{ url_for('profile') }}">Back to profile</a>
+
+</div>
+{% endblock %}

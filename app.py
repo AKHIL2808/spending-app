@@ -302,6 +302,19 @@ def profile():
     return render_template("profile.html", **context)
 
 
+@app.route("/analytics")
+def analytics():
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    if get_user_by_id(user_id) is None:
+        session.clear()
+        return redirect(url_for("login"))
+
+    return render_template("analytics.html")
+
+
 # ------------------------------------------------------------------ #
 # Placeholder routes — students will implement these                  #
 # ------------------------------------------------------------------ #
