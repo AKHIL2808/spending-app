@@ -99,7 +99,7 @@ pytest -s
 | `GET /logout` | Implemented — Step 3 (clears session, redirects to `/`) |
 | `GET /profile` | Implemented — Step 5 (login-guarded, DB-wired); Step 6 adds date filter (`?preset=` / `?start=&end=`) |
 | `GET /analytics` | Implemented — Step 7 "coming soon" placeholder (login-guarded, no data) |
-| `GET /expenses/add` | Stub — Step 7 |
+| `GET/POST /expenses/add` | Implemented — Step 8 (login-guarded, validated insert, redirects to `/profile`) |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
 | `GET /expenses/<id>/delete` | Stub — Step 9 |
 

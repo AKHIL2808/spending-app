@@ -178,6 +178,20 @@ def get_recent_expenses(user_id, limit=10, start_date=None, end_date=None):
         conn.close()
 
 
+def create_expense(user_id, amount, category, date, description):
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            "INSERT INTO expenses (user_id, amount, category, date, description)"
+            " VALUES (?, ?, ?, ?, ?)",
+            (user_id, amount, category, date, description or None),
+        )
+        conn.commit()
+        return cursor.lastrowid
+    finally:
+        conn.close()
+
+
 def _largest_remainder_percents(totals):
     """Round shares of the total to whole percents that always sum to 100."""
     grand = sum(totals)
