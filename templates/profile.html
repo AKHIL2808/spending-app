@@ -18,6 +18,32 @@
         </div>
     </section>
 
+    <section class="filter-bar" aria-label="Filter by date">
+        <div class="filter-chips">
+            {% for key, label in presets %}
+            <a class="filter-chip{% if date_filter.active == key %} filter-chip--active{% endif %}"
+               href="{{ url_for('profile', preset=key) }}"
+               {% if date_filter.active == key %}aria-current="true"{% endif %}>{{ label }}</a>
+            {% endfor %}
+        </div>
+        <form class="filter-form" method="get" action="{{ url_for('profile') }}">
+            <div class="filter-field">
+                <label for="filter-start">From</label>
+                <input class="form-input" type="date" id="filter-start" name="start" value="{{ date_filter.start_value }}">
+            </div>
+            <div class="filter-field">
+                <label for="filter-end">To</label>
+                <input class="form-input" type="date" id="filter-end" name="end" value="{{ date_filter.end_value }}">
+            </div>
+            <button type="submit" class="btn-primary">Apply</button>
+            <a class="btn-ghost" href="{{ url_for('profile') }}">Clear</a>
+        </form>
+        <p class="filter-label"><i data-lucide="calendar"></i>{{ date_filter.label }}</p>
+        {% if date_filter.error %}
+        <p class="filter-error" role="alert">{{ date_filter.error }}</p>
+        {% endif %}
+    </section>
+
     <section class="profile-stats" aria-label="Spending summary">
         <div class="profile-stat">
             <span class="profile-stat-icon"><i data-lucide="wallet"></i></span>
@@ -63,7 +89,7 @@
                 </table>
             </div>
             {% else %}
-            <p class="empty-state">No transactions yet.</p>
+            <p class="empty-state">{% if date_filter.active != 'all' %}No transactions in this period.{% else %}No transactions yet.{% endif %}</p>
             {% endif %}
         </section>
 
@@ -80,7 +106,7 @@
                 {% endfor %}
             </ul>
             {% else %}
-            <p class="empty-state">No spending to break down yet.</p>
+            <p class="empty-state">{% if date_filter.active != 'all' %}No spending in this period.{% else %}No spending to break down yet.{% endif %}</p>
             {% endif %}
         </section>
     </div>
