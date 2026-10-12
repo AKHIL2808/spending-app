@@ -401,9 +401,9 @@ class TestStaticAssetRules:
 class TestStubsUnchanged:
     @pytest.mark.parametrize(
         "path,text",
-        [("/expenses/1/edit", "Step 8"), ("/expenses/1/delete", "Step 9")],
+        [("/expenses/1/delete", "Step 9")],
     )
-    def test_edit_delete_stubs_still_placeholders(self, client, path, text):
+    def test_delete_stub_still_placeholder(self, client, path, text):
         resp = client.get(path)
         assert resp.status_code == 200
         assert text in resp.data.decode()

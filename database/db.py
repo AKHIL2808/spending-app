@@ -10,7 +10,15 @@ from werkzeug.security import generate_password_hash
 
 DB_PATH = Path(__file__).parent.parent / "expense_tracker.db"
 
-CATEGORIES = ["Food", "Transport", "Bills", "Health", "Entertainment", "Shopping", "Other"]
+CATEGORIES = [
+    "Food",
+    "Transport",
+    "Bills",
+    "Health",
+    "Entertainment",
+    "Shopping",
+    "Other",
+]
 
 
 def get_db():
@@ -22,7 +30,8 @@ def get_db():
 
 def init_db():
     conn = get_db()
-    conn.executescript("""
+    conn.executescript(
+        """
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT NOT NULL,
@@ -41,7 +50,8 @@ def init_db():
             created_at TEXT NOT NULL DEFAULT (datetime('now')),
             FOREIGN KEY (user_id) REFERENCES users (id)
         );
-    """)
+    """
+    )
     conn.commit()
     conn.close()
 
@@ -85,9 +95,7 @@ def seed_db():
 def get_user_by_email(email):
     conn = get_db()
     try:
-        return conn.execute(
-            "SELECT * FROM users WHERE email = ?", (email,)
-        ).fetchone()
+        return conn.execute("SELECT * FROM users WHERE email = ?", (email,)).fetchone()
     finally:
         conn.close()
 
@@ -164,7 +172,7 @@ def get_recent_expenses(user_id, limit=10, start_date=None, end_date=None):
     try:
         rows = conn.execute(
             """
-            SELECT date, description, category, amount FROM expenses
+            SELECT id, date, description, category, amount FROM expenses
             WHERE user_id = ?"""
             + clause
             + """
@@ -188,6 +196,33 @@ def create_expense(user_id, amount, category, date, description):
         )
         conn.commit()
         return cursor.lastrowid
+    finally:
+        conn.close()
+
+
+def get_expense(expense_id, user_id):
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT id, amount, category, date, description FROM expenses"
+            " WHERE id = ? AND user_id = ?",
+            (expense_id, user_id),
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def update_expense(expense_id, user_id, amount, category, date, description):
+    conn = get_db()
+    try:
+        cursor = conn.execute(
+            "UPDATE expenses SET amount = ?, category = ?, date = ?, description = ?"
+            " WHERE id = ? AND user_id = ?",
+            (amount, category, date, description or None, expense_id, user_id),
+        )
+        conn.commit()
+        return cursor.rowcount == 1
     finally:
         conn.close()
 

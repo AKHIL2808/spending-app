@@ -197,7 +197,6 @@ class TestExistingBehaviourUnchanged:
     @pytest.mark.parametrize(
         "path,text",
         [
-            ("/expenses/1/edit", "Step 8"),
             ("/expenses/1/delete", "Step 9"),
         ],
     )
