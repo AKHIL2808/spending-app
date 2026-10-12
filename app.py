@@ -1,3 +1,4 @@
+import math
 import os
 import sqlite3
 from datetime import date, datetime, timedelta
@@ -6,6 +7,8 @@ from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from database.db import (
+    CATEGORIES,
+    create_expense,
     create_user,
     get_category_breakdown,
     get_expense_summary,
@@ -40,6 +43,9 @@ DATE_PRESETS = [
     ("all", "All time"),
 ]
 PRESET_KEYS = {key for key, _ in DATE_PRESETS}
+
+MAX_EXPENSE_AMOUNT = 10_000_000
+MAX_DESCRIPTION_LENGTH = 200
 
 
 def _format_currency(value):
@@ -98,6 +104,56 @@ def _preset_range(key, today):
 
 def _parse_iso_date(value):
     return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def _expense_form_values(form, default_date=""):
+    """Raw, stripped form input used to validate and to refill the form."""
+    return {
+        "amount": form.get("amount", "").strip(),
+        "category": form.get("category", "").strip(),
+        "date": form.get("date", default_date).strip(),
+        "description": form.get("description", "").strip(),
+    }
+
+
+def _validate_expense_form(values):
+    """Return (cleaned, None) on success or (None, error message)."""
+    if not values["amount"]:
+        return None, "Amount is required."
+    try:
+        amount = float(values["amount"])
+    except (ValueError, OverflowError):
+        return None, "Amount must be a number."
+    if not math.isfinite(amount):
+        return None, "Amount must be a number."
+    amount = round(amount, 2)
+    if amount <= 0:
+        return None, "Amount must be greater than 0."
+    if amount > MAX_EXPENSE_AMOUNT:
+        return None, f"Amount must be at most {MAX_EXPENSE_AMOUNT:,}."
+
+    if values["category"] not in CATEGORIES:
+        return None, "Choose a valid category."
+
+    try:
+        # strptime accepts unpadded values like 2026-1-5; require exact YYYY-MM-DD.
+        if len(values["date"]) != 10:
+            raise ValueError("date must be zero-padded YYYY-MM-DD")
+        parsed_date = _parse_iso_date(values["date"])
+    except (ValueError, OverflowError):
+        return None, "Enter the date as YYYY-MM-DD."
+
+    if len(values["description"]) > MAX_DESCRIPTION_LENGTH:
+        return None, (
+            f"Description must be {MAX_DESCRIPTION_LENGTH} characters or fewer."
+        )
+
+    return {
+        "amount": amount,
+        "category": values["category"],
+        "date": parsed_date.isoformat(),
+        "description": values["description"],
+    }, None
 
 
 def _range_label(start, end):
@@ -320,9 +376,37 @@ def analytics():
 # ------------------------------------------------------------------ #
 
 
-@app.route("/expenses/add")
+@app.route("/expenses/add", methods=["GET", "POST"])
 def add_expense():
-    return "Add expense — coming in Step 7"
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    if get_user_by_id(user_id) is None:
+        session.clear()
+        return redirect(url_for("login"))
+
+    if request.method == "GET":
+        values = _expense_form_values({}, date.today().isoformat())
+        return render_template(
+            "add_expense.html", values=values, categories=CATEGORIES, error=None
+        )
+
+    values = _expense_form_values(request.form)
+    cleaned, error = _validate_expense_form(values)
+    if error:
+        return render_template(
+            "add_expense.html", values=values, categories=CATEGORIES, error=error
+        ), 400
+
+    create_expense(
+        user_id,
+        cleaned["amount"],
+        cleaned["category"],
+        cleaned["date"],
+        cleaned["description"],
+    )
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/edit")
