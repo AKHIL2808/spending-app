@@ -3,7 +3,7 @@ import os
 import sqlite3
 from datetime import date, datetime, timedelta
 
-from flask import Flask, redirect, render_template, request, session, url_for
+from flask import Flask, abort, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
 
 from database.db import (
@@ -11,12 +11,14 @@ from database.db import (
     create_expense,
     create_user,
     get_category_breakdown,
+    get_expense,
     get_expense_summary,
     get_recent_expenses,
     get_user_by_email,
     get_user_by_id,
     init_db,
     seed_db,
+    update_expense,
 )
 
 app = Flask(__name__)
@@ -219,6 +221,7 @@ def _build_profile_context(user_row, date_filter):
     }
     transactions = [
         {
+            "id": expense["id"],
             "date": expense["date"],
             "description": expense["description"],
             "category": expense["category"],
@@ -251,6 +254,7 @@ def _build_profile_context(user_row, date_filter):
 # ------------------------------------------------------------------ #
 # Routes                                                              #
 # ------------------------------------------------------------------ #
+
 
 @app.route("/")
 def landing():
@@ -291,9 +295,10 @@ def register():
             error = "An account with that email already exists."
 
     if error:
-        return render_template(
-            "register.html", error=error, name=name, email=email
-        ), 400
+        return (
+            render_template("register.html", error=error, name=name, email=email),
+            400,
+        )
     return redirect(url_for("login"))
 
 
@@ -395,9 +400,12 @@ def add_expense():
     values = _expense_form_values(request.form)
     cleaned, error = _validate_expense_form(values)
     if error:
-        return render_template(
-            "add_expense.html", values=values, categories=CATEGORIES, error=error
-        ), 400
+        return (
+            render_template(
+                "add_expense.html", values=values, categories=CATEGORIES, error=error
+            ),
+            400,
+        )
 
     create_expense(
         user_id,
@@ -409,9 +417,59 @@ def add_expense():
     return redirect(url_for("profile"))
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
 def edit_expense(id):
-    return "Edit expense — coming in Step 8"
+    user_id = session.get("user_id")
+    if not user_id:
+        return redirect(url_for("login"))
+
+    if get_user_by_id(user_id) is None:
+        session.clear()
+        return redirect(url_for("login"))
+
+    expense = get_expense(id, user_id)
+    if expense is None:
+        abort(404)
+
+    if request.method == "GET":
+        values = {
+            "amount": f"{expense['amount']:.2f}",
+            "category": expense["category"],
+            "date": expense["date"],
+            "description": expense["description"] or "",
+        }
+        return render_template(
+            "add_expense.html",
+            values=values,
+            categories=CATEGORIES,
+            error=None,
+            expense_id=id,
+        )
+
+    values = _expense_form_values(request.form)
+    cleaned, error = _validate_expense_form(values)
+    if error:
+        return (
+            render_template(
+                "add_expense.html",
+                values=values,
+                categories=CATEGORIES,
+                error=error,
+                expense_id=id,
+            ),
+            400,
+        )
+
+    if not update_expense(
+        id,
+        user_id,
+        cleaned["amount"],
+        cleaned["category"],
+        cleaned["date"],
+        cleaned["description"],
+    ):
+        abort(404)
+    return redirect(url_for("profile"))
 
 
 @app.route("/expenses/<int:id>/delete")

@@ -678,7 +678,6 @@ class TestIsolationAndSideEffects:
 
 class TestStubRoutesUntouched:
     @pytest.mark.parametrize("path,text", [
-        ("/expenses/1/edit", "Step 8"),
         ("/expenses/1/delete", "Step 9"),
     ])
     def test_stub_routes_still_stubs(self, client, path, text):
