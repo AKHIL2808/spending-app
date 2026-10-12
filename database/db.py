@@ -115,22 +115,39 @@ def create_user(name, email, password):
         conn.close()
 
 
-def get_expense_summary(user_id):
+def _date_clause(start_date, end_date):
+    """Optional inclusive date bounds; the SQL is fixed text, values are bound."""
+    clause = ""
+    params = []
+    if start_date:
+        clause += " AND date >= ?"
+        params.append(start_date)
+    if end_date:
+        clause += " AND date <= ?"
+        params.append(end_date)
+    return clause, params
+
+
+def get_expense_summary(user_id, start_date=None, end_date=None):
+    clause, params = _date_clause(start_date, end_date)
     conn = get_db()
     try:
         total, count = conn.execute(
-            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM expenses WHERE user_id = ?",
-            (user_id,),
+            "SELECT COALESCE(SUM(amount), 0), COUNT(*) FROM expenses"
+            " WHERE user_id = ?" + clause,
+            (user_id, *params),
         ).fetchone()
         # Separate query so ties on total break deterministically by name.
         top = conn.execute(
             """
-            SELECT category FROM expenses WHERE user_id = ?
+            SELECT category FROM expenses WHERE user_id = ?"""
+            + clause
+            + """
             GROUP BY category
             ORDER BY SUM(amount) DESC, category ASC
             LIMIT 1
             """,
-            (user_id,),
+            (user_id, *params),
         ).fetchone()
         return {
             "total_spent": round(total, 2),
@@ -141,17 +158,20 @@ def get_expense_summary(user_id):
         conn.close()
 
 
-def get_recent_expenses(user_id, limit=10):
+def get_recent_expenses(user_id, limit=10, start_date=None, end_date=None):
+    clause, params = _date_clause(start_date, end_date)
     conn = get_db()
     try:
         rows = conn.execute(
             """
             SELECT date, description, category, amount FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?"""
+            + clause
+            + """
             ORDER BY date DESC, id DESC
             LIMIT ?
             """,
-            (user_id, limit),
+            (user_id, *params, limit),
         ).fetchall()
         return [dict(row) for row in rows]
     finally:
@@ -174,17 +194,20 @@ def _largest_remainder_percents(totals):
     return percents
 
 
-def get_category_breakdown(user_id):
+def get_category_breakdown(user_id, start_date=None, end_date=None):
+    clause, params = _date_clause(start_date, end_date)
     conn = get_db()
     try:
         rows = conn.execute(
             """
             SELECT category, SUM(amount) AS total FROM expenses
-            WHERE user_id = ?
+            WHERE user_id = ?"""
+            + clause
+            + """
             GROUP BY category
             ORDER BY total DESC, category ASC
             """,
-            (user_id,),
+            (user_id, *params),
         ).fetchall()
     finally:
         conn.close()

@@ -1,6 +1,6 @@
 import os
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 from flask import Flask, redirect, render_template, request, session, url_for
 from werkzeug.security import check_password_hash
@@ -32,6 +32,15 @@ with app.app_context():
 # Must match the badge--/breakdown-meter-- classes in static/css/profile.css.
 CATEGORY_SLUGS = {"food", "transport", "bills", "shopping"}
 
+DATE_PRESETS = [
+    ("this-month", "This month"),
+    ("last-month", "Last month"),
+    ("last-30", "Last 30 days"),
+    ("last-90", "Last 90 days"),
+    ("all", "All time"),
+]
+PRESET_KEYS = {key for key, _ in DATE_PRESETS}
+
 
 def _format_currency(value):
     return f"₹{value:,.2f}"
@@ -56,9 +65,90 @@ def _category_slug(name):
     return slug if slug in CATEGORY_SLUGS else "other"
 
 
-def _build_profile_context(user_row):
+def _format_date_label(value):
+    return f"{value.day} {value:%b %Y}"
+
+
+def _all_time_filter(error=None):
+    return {
+        "start": None,
+        "end": None,
+        "active": "all",
+        "label": "Showing all time",
+        "error": error,
+        "start_value": "",
+        "end_value": "",
+    }
+
+
+def _preset_range(key, today):
+    if key == "this-month":
+        first = today.replace(day=1)
+        next_first = (today.replace(day=28) + timedelta(days=4)).replace(day=1)
+        return first, next_first - timedelta(days=1)
+    if key == "last-month":
+        last_day = today.replace(day=1) - timedelta(days=1)
+        return last_day.replace(day=1), last_day
+    if key == "last-30":
+        return today - timedelta(days=29), today
+    if key == "last-90":
+        return today - timedelta(days=89), today
+    return None, None
+
+
+def _parse_iso_date(value):
+    return datetime.strptime(value, "%Y-%m-%d").date()
+
+
+def _range_label(start, end):
+    if start and end:
+        return f"Showing {_format_date_label(start)} – {_format_date_label(end)}"
+    if start:
+        return f"Showing from {_format_date_label(start)}"
+    if end:
+        return f"Showing up to {_format_date_label(end)}"
+    return "Showing all time"
+
+
+def _resolve_date_filter(args, today):
+    """Turn query args into a validated date range; never raises on bad input."""
+    start_raw = args.get("start", "").strip()
+    end_raw = args.get("end", "").strip()
+    preset = args.get("preset", "").strip()
+
+    if start_raw or end_raw:
+        try:
+            start = _parse_iso_date(start_raw) if start_raw else None
+            end = _parse_iso_date(end_raw) if end_raw else None
+        except (ValueError, OverflowError):
+            return _all_time_filter("Enter dates as YYYY-MM-DD.")
+        if start and end and start > end:
+            return _all_time_filter("Start date must be on or before end date.")
+        active = "custom"
+    elif preset:
+        if preset not in PRESET_KEYS:
+            return _all_time_filter("Unknown date preset.")
+        start, end = _preset_range(preset, today)
+        active = preset
+    else:
+        return _all_time_filter()
+
+    return {
+        "start": start.isoformat() if start else None,
+        "end": end.isoformat() if end else None,
+        "active": active,
+        "label": _range_label(start, end),
+        "error": None,
+        "start_value": start.isoformat() if start else "",
+        "end_value": end.isoformat() if end else "",
+    }
+
+
+def _build_profile_context(user_row, date_filter):
     user_id = user_row["id"]
-    summary = get_expense_summary(user_id)
+    start_date = date_filter["start"]
+    end_date = date_filter["end"]
+    summary = get_expense_summary(user_id, start_date, end_date)
 
     user = {
         "name": user_row["name"],
@@ -79,7 +169,9 @@ def _build_profile_context(user_row):
             "slug": _category_slug(expense["category"]),
             "amount": _format_currency(expense["amount"]),
         }
-        for expense in get_recent_expenses(user_id)
+        for expense in get_recent_expenses(
+            user_id, start_date=start_date, end_date=end_date
+        )
     ]
     categories = [
         {
@@ -88,13 +180,15 @@ def _build_profile_context(user_row):
             "total": _format_currency(category["total"]),
             "percent": category["percent"],
         }
-        for category in get_category_breakdown(user_id)
+        for category in get_category_breakdown(user_id, start_date, end_date)
     ]
     return {
         "user": user,
         "stats": stats,
         "transactions": transactions,
         "categories": categories,
+        "date_filter": date_filter,
+        "presets": DATE_PRESETS,
     }
 
 
@@ -202,7 +296,8 @@ def profile():
         session.clear()
         return redirect(url_for("login"))
 
-    context = _build_profile_context(user_row)
+    date_filter = _resolve_date_filter(request.args, date.today())
+    context = _build_profile_context(user_row, date_filter)
 
     return render_template("profile.html", **context)
 

@@ -97,7 +97,7 @@ pytest -s
 | `GET /login` | Implemented — renders `login.html` |
 | `GET/POST /login` | Implemented — Step 3 (session login) |
 | `GET /logout` | Implemented — Step 3 (clears session, redirects to `/`) |
-| `GET /profile` | Implemented — Step 5 (login-guarded, DB-wired) |
+| `GET /profile` | Implemented — Step 5 (login-guarded, DB-wired); Step 6 adds date filter (`?preset=` / `?start=&end=`) |
 | `GET /expenses/add` | Stub — Step 7 |
 | `GET /expenses/<id>/edit` | Stub — Step 8 |
 | `GET /expenses/<id>/delete` | Stub — Step 9 |
